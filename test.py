@@ -29,16 +29,17 @@ class INIT_TEST():
             c1, c2 = self.load_data(test_data)
             for dir_path, model_name in self.pretrained_model_name_and_path.items():
                 self.save_features(c1, c2, test_data, dir_path, model_name)
-                self.model_CodeBERTaPy, self.model_graphcode, self.model_codebert_mlm = self.load_model(dir_path, model_name)
+                self.load_model(dir_path, model_name)
         else:
             # load saved tensors
             for dir_path, model_name in self.pretrained_model_name_and_path.items():
                 self.load_features(dir_path, model_name)
-                self.model_CodeBERTaPy, self.model_graphcode, self.model_codebert_mlm = self.load_model(dir_path, model_name)
+                self.load_model(dir_path, model_name)
 
 
         batch_size = 512
 
+        # 위 else 일 경우 수행
         test_tensor = TensorDataset(self.CodeBERTaPy_test_input_ids, self.CodeBERTaPy_test_attention_masks)
         test_sampler = SequentialSampler(test_tensor)
         self.CodeBERTaPy_test_dataloader = DataLoader(test_tensor, sampler=test_sampler, batch_size=batch_size)
@@ -60,23 +61,21 @@ class INIT_TEST():
 
         if model_name == 'mrm8488/CodeBERTaPy':
             self.model_CodeBERTaPy = AutoModelForSequenceClassification.from_pretrained(model_name)
-            PATH = './data/' + dir_path + '/' + 'codebertapy_2epoch_0524.pt'
+            PATH = './data/' + dir_path + '/' + '1_codebertapy_0531.pt'
             self.model_CodeBERTaPy.load_state_dict(torch.load(PATH))
             self.model_CodeBERTaPy.cuda()
 
         elif model_name == 'microsoft/graphcodebert-base':
             self.model_graphcode = AutoModelForSequenceClassification.from_pretrained(model_name)
-            PATH = './data/' + dir_path + '/' + 'graphcodebert-base_1_0524.pt'
+            PATH = './data/' + dir_path + '/' + '1_graphcodebert-base_0531.pt'
             self.model_graphcode.load_state_dict(torch.load(PATH))
             self.model_graphcode.cuda()
 
         elif model_name == 'microsoft/codebert-base-mlm':
             self.model_codebert_mlm = AutoModelForSequenceClassification.from_pretrained(model_name)
-            PATH = './data/' + dir_path + '/' + 'codebert-base-mlm_1_0524.pt'
+            PATH = './data/' + dir_path + '/' + '2_codebert-base-mlm_0531.pt'
             self.model_codebert_mlm.load_state_dict(torch.load(PATH))
             self.model_codebert_mlm.cuda()
-
-        return self.model_CodeBERTaPy, self.model_graphcode, self.model_codebert_mlm
 
 
     def load_data(self, data):
@@ -135,7 +134,10 @@ class INIT_TEST():
 
     def do_test(self):
 
-        submission = pd.read_csv('./data/sample_submission.csv')
+        submission_1 = pd.read_csv('./data/sample_submission.csv')
+        submission_2 = pd.read_csv('./data/sample_submission.csv')
+        submission_3 = pd.read_csv('./data/sample_submission.csv')
+
 
         device = torch.device("cuda")
 
@@ -161,8 +163,11 @@ class INIT_TEST():
 
             preds_1 = np.append(preds, pred)
 
+        submission_1['similar'] = preds_1
+        submission_1.to_csv('./data/submission_CodeBERTaPy_0602.csv', index=False)
+
         preds = np.array([])
-        # for CodeBERTaPy
+        # for graphcodebert
         for step, batch in tqdm(enumerate(self.graphcodebert_test_dataloader), desc="Iteration", smoothing=0.05):
             batch = tuple(t.to(device) for t in batch)
             b_input_ids, b_input_mask = batch
@@ -178,8 +183,11 @@ class INIT_TEST():
 
             preds_2 = np.append(preds, pred)
 
+        submission_2['similar'] = preds_2
+        submission_2.to_csv('./data/submission_graphcodebert_0602.csv', index=False)
+
         preds = np.array([])
-        # for CodeBERTaPy
+        # for codebert_mlm
         for step, batch in tqdm(enumerate(self.codebert_mlm_test_dataloader), desc="Iteration", smoothing=0.05):
             batch = tuple(t.to(device) for t in batch)
             b_input_ids, b_input_mask = batch
@@ -195,10 +203,14 @@ class INIT_TEST():
 
             preds_3 = np.append(preds, pred)
 
-        preds = (preds_1 + preds_2 + preds_3) / 3
-        # preds = np.where(preds > 0.5, 1, 0)
-        submission['similar'] = preds
-        submission.to_csv('./data/submission_ensemble.csv', index=False)
+        submission_3['similar'] = preds_3
+        submission_3.to_csv('./data/submission_codebert_mlm_0602.csv', index=False)
+
+        # For ensemble
+        # preds = (preds_1 + preds_2 + preds_3) / 3
+        # # preds = np.where(preds > 0.5, 1, 0)
+        # submission['similar'] = preds
+        # submission.to_csv('./data/submission_ensemble_0602.csv', index=False)
 
 
 if __name__ == "__main__":
