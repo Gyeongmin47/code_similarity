@@ -16,14 +16,54 @@ print("")
 print("Validating...")
 
 
-# load test_dataset
-
-
-
 # load model
 # checkpoint = 'mrm8488/CodeBERTaPy'
 # checkpoint = 'microsoft/graphcodebert-base'
 checkpoint = 'microsoft/codebert-base-mlm'
+
+
+test_data = pd.read_csv("./data/new_dataset/processed_dacon_code_test_data.csv")
+
+c1 = test_data['code1'].values
+c2 = test_data['code2'].values
+
+N = test_data.shape[0]
+MAX_LEN = 512
+
+test_input_ids = np.zeros((N, MAX_LEN), dtype=int)
+test_attention_masks = np.zeros((N, MAX_LEN), dtype=int)
+
+tokenizer = AutoTokenizer.from_pretrained(checkpoint)
+
+for i in tqdm(range(N), position=0, leave=True):
+    try:
+        cur_c1 = c1[i]
+        cur_c2 = c2[i]
+        encoded_input = tokenizer(cur_c1, cur_c2, return_tensors='pt', max_length=512, padding='max_length',
+                                       truncation=True)
+        test_input_ids[i,] = encoded_input['input_ids']
+        test_attention_masks[i,] = encoded_input['attention_mask']
+
+    except Exception as e:
+        print(e)
+        pass
+
+
+test_input_ids = torch.tensor(test_input_ids, dtype=int)
+test_attention_masks = torch.tensor(test_attention_masks, dtype=int)
+
+# torch.save(test_input_ids, "./data/CodeBERTaPy/test_input_ids.pt")
+# torch.save(test_attention_masks, "./data/CodeBERTaPy/test_attention_masks.pt")
+
+# torch.save(test_input_ids, "./data/graphcodebert/test_input_ids.pt")
+# torch.save(test_attention_masks, "./data/graphcodebert/test_attention_masks.pt")
+
+torch.save(test_input_ids, "./data/codebert-mlm/test_input_ids.pt")
+torch.save(test_attention_masks, "./data/codebert-mlm/test_attention_masks.pt")
+
+
+# load test_dataset
+
 
 model = AutoModelForSequenceClassification.from_pretrained(checkpoint)
 # PATH = './data/CodeBERTaPy/1_codebertapy_0531.pt'
@@ -39,11 +79,10 @@ model.cuda()
 # test_input_ids = torch.load("./data/graphcodebert/test_input_ids.pt")
 # test_attention_masks = torch.load("./data/graphcodebert/test_attention_masks.pt")
 
-test_input_ids = torch.load("./data/codebert-mlm/test_input_ids.pt")
-test_attention_masks = torch.load("./data/codebert-mlm/test_attention_masks.pt")
+# test_input_ids = torch.load("./data/codebert-mlm/test_input_ids.pt")
+# test_attention_masks = torch.load("./data/codebert-mlm/test_attention_masks.pt")
 
-
-batch_size = 512
+batch_size = 1024
 
 test_tensor = TensorDataset(test_input_ids, test_attention_masks)
 test_sampler = SequentialSampler(test_tensor)
@@ -69,5 +108,7 @@ for step, batch in tqdm(enumerate(test_dataloader), desc="Iteration", smoothing=
     preds = np.append(preds, pred)
 
 submission['similar'] = preds
-submission.to_csv('./data/submission_codebert-mlm_0602.csv', index=False)
+# submission.to_csv('./data/submission_CodeBERTaPy_0603.csv', index=False)
+# submission.to_csv('./data/submission_graphcodebert_0603.csv', index=False)
+submission.to_csv('./data/submission_codebertapy-mlm_0603.csv', index=False)
 
