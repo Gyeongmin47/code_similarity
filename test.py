@@ -23,9 +23,9 @@ class INIT_TEST():
                                                'graphcodebert': 'microsoft/graphcodebert-base',
                                                'codebert-mlm': 'microsoft/codebert-base-mlm'}
 
-        test_data = pd.read_csv("./data/test.csv")
 
         if args.save_feature:
+            test_data = pd.read_csv("./data/test.csv")
             c1, c2 = self.load_data(test_data)
             for dir_path, model_name in self.pretrained_model_name_and_path.items():
                 self.save_features(c1, c2, test_data, dir_path, model_name)
@@ -138,14 +138,13 @@ class INIT_TEST():
         submission_2 = pd.read_csv('./data/sample_submission.csv')
         submission_3 = pd.read_csv('./data/sample_submission.csv')
 
-
         device = torch.device("cuda")
-
-        preds = np.array([])
 
         global preds_1
         global preds_2
         global preds_3
+
+        preds = np.array([])
 
         # for CodeBERTaPy
         for step, batch in tqdm(enumerate(self.CodeBERTaPy_test_dataloader), desc="Iteration", smoothing=0.05):
@@ -157,14 +156,15 @@ class INIT_TEST():
 
             logits = outputs[0]
             logits = logits.detach().cpu()
-
             _pred = logits.numpy()
             pred = np.argmax(_pred, axis=1).flatten()
 
-            preds_1 = np.append(preds, pred)
+            pred = np.where(pred >= 0.5, 1, 0)
+            preds = np.append(preds, pred)
 
-        submission_1['similar'] = preds_1
+        submission_1['similar'] = preds
         submission_1.to_csv('./data/submission_CodeBERTaPy_0602.csv', index=False)
+
 
         preds = np.array([])
         # for graphcodebert
@@ -181,9 +181,10 @@ class INIT_TEST():
             _pred = logits.numpy()
             pred = np.argmax(_pred, axis=1).flatten()
 
-            preds_2 = np.append(preds, pred)
+            pred = np.where(pred > 0.5, 1, 0)
+            preds = np.append(preds, pred)
 
-        submission_2['similar'] = preds_2
+        submission_2['similar'] = preds
         submission_2.to_csv('./data/submission_graphcodebert_0602.csv', index=False)
 
         preds = np.array([])
@@ -201,9 +202,10 @@ class INIT_TEST():
             _pred = logits.numpy()
             pred = np.argmax(_pred, axis=1).flatten()
 
-            preds_3 = np.append(preds, pred)
+            pred = np.where(pred > 0.5, 1, 0)
+            preds = np.append(preds, pred)
 
-        submission_3['similar'] = preds_3
+        submission_3['similar'] = preds
         submission_3.to_csv('./data/submission_codebert_mlm_0602.csv', index=False)
 
         # For ensemble
