@@ -18,12 +18,10 @@ import os
 
 setproctitle("Gyeongmin")
 
-os.environ["CUDA_VISIBLE_DEVICES"] = "2"
+# os.environ["CUDA_VISIBLE_DEVICES"] = "2"
 
 dir_path = 'codebert-mlm/'     # CodeBERTaPy/, graphcodebert/ /codebert-mlm
 checkpoint_path = "microsoft/codebert-base-mlm"
-
-# CUDA_VISIBLE_DEVICES=1 python codebertmlm.py
 
 
 # model = RobertaForMaskedLM.from_pretrained("microsoft/codebert-base-mlm")
@@ -39,7 +37,7 @@ checkpoint_path = "microsoft/codebert-base-mlm"
 # test = pd.read_csv("./data/test.csv")
 
 
-#
+
 # def preprocess_script(script):
 #     '''
 #     간단한 전처리 함수
@@ -84,6 +82,7 @@ checkpoint_path = "microsoft/codebert-base-mlm"
 # df = pd.DataFrame(data = {'code':preproc_scripts, 'problem_num':problem_nums})
 
 tokenizer = AutoTokenizer.from_pretrained(checkpoint_path)
+tokenizer.truncation_side = "left"
 
 # df['tokens'] = df['code'].apply(tokenizer.tokenize)
 # df['len'] = df['tokens'].apply(len)
@@ -235,8 +234,10 @@ tokenizer = AutoTokenizer.from_pretrained(checkpoint_path)
 # pair_data.to_csv('./data/' + dir_path + 'valid_data.csv', index=False)
 
 # read saved train and validation data
-train_data = pd.read_csv("./data/" + "new_dataset/dacon_code_train_data.csv")
-valid_data = pd.read_csv("./data/" + "new_dataset/dacon_code_valid_data.csv")
+# train_data = pd.read_csv("./data/" + "new_dataset/dacon_code_train_data.csv")
+# valid_data = pd.read_csv("./data/" + "new_dataset/dacon_code_valid_data.csv")
+train_data = pd.read_csv("./data/" + "new_dataset_0604/clean_train_data_BM25L.csv")
+valid_data = pd.read_csv("./data/" + "new_dataset_0604/clean_valid_data_BM25L.csv")
 
 
 c1 = train_data['code1'].values
@@ -252,8 +253,8 @@ labels = np.zeros((N),dtype=int)
 
 for i in tqdm(range(N), position=0, leave=True):
     try:
-        cur_c1 = c1[i]
-        cur_c2 = c2[i]
+        cur_c1 = str(c1[i])
+        cur_c2 = str(c2[i])
         encoded_input = tokenizer(cur_c1, cur_c2, return_tensors='pt', max_length=512, padding='max_length', truncation=True)
         input_ids[i,] = encoded_input['input_ids']
         attention_masks[i,] = encoded_input['attention_mask']
@@ -293,8 +294,8 @@ def format_time(elapsed):
 
 for i in tqdm(range(N), position=0, leave=True):
     try:
-        cur_c1 = c1[i]
-        cur_c2 = c2[i]
+        cur_c1 = str(c1[i])
+        cur_c2 = str(c2[i])
         encoded_input = tokenizer(cur_c1, cur_c2, return_tensors='pt', max_length=512, padding='max_length', truncation=True)
         valid_input_ids[i,] = encoded_input['input_ids']
         valid_attention_masks[i,] = encoded_input['attention_mask']
@@ -313,28 +314,27 @@ valid_attention_masks = torch.tensor(valid_attention_masks, dtype=int)
 valid_labels = torch.tensor(valid_labels, dtype=int)
 
 
-torch.save(input_ids, "./data/" + dir_path + 'train_input_ids_0531.pt')
-torch.save(attention_masks, "./data/" + dir_path + 'train_attention_masks_0531.pt')
-torch.save(labels, "./data/" + dir_path + "train_labels_0531.pt")
+torch.save(input_ids, "./data/" + dir_path + 'train_input_ids_BM25L_0605.pt')
+torch.save(attention_masks, "./data/" + dir_path + 'train_attention_masks_BM25L_0605.pt')
+torch.save(labels, "./data/" + dir_path + "train_labels_BM25L_0605.pt")
 
-torch.save(valid_input_ids, "./data/" + dir_path + "valid_input_ids_0531.pt")
-torch.save(valid_attention_masks, "./data/" + dir_path + "valid_attention_masks_0531.pt")
-torch.save(valid_labels, "./data/" + dir_path + "valid_labels_0531.pt")
-
+torch.save(valid_input_ids, "./data/" + dir_path + "valid_input_ids_BM25L_0605.pt")
+torch.save(valid_attention_masks, "./data/" + dir_path + "valid_attention_masks_BM25L_0605.pt")
+torch.save(valid_labels, "./data/" + dir_path + "valid_labels_BM25L_0605.pt")
 
 
 # load saved models
-# input_ids = torch.load("./data/" + dir_path + 'train_input_ids_0531.pt')
-# attention_masks = torch.load("./data/" + dir_path + 'train_attention_masks_0531.pt')
-# labels = torch.load("./data/" + dir_path + 'train_labels_0531.pt')
-#
-# valid_input_ids = torch.load("./data/" + dir_path + 'valid_input_ids_0531.pt')
-# valid_attention_masks = torch.load("./data/" + dir_path + 'valid_attention_masks_0531.pt')
-# valid_labels = torch.load("./data/" + dir_path + 'valid_labels_0531.pt')
+# input_ids = torch.load("./data/" + dir_path + 'train_input_ids_0604.pt')
+# attention_masks = torch.load("./data/" + dir_path + 'train_attention_masks_0604.pt')
+# labels = torch.load("./data/" + dir_path + 'train_labels_0604.pt')
+
+# valid_input_ids = torch.load("./data/" + dir_path + 'valid_input_ids_0604.pt')
+# valid_attention_masks = torch.load("./data/" + dir_path + 'valid_attention_masks_0604.pt')
+# valid_labels = torch.load("./data/" + dir_path + 'valid_labels_0604.pt')
 
 
+batch_size = 96 # for server14= 96, sever12=48
 
-batch_size = 64
 train_data = TensorDataset(input_ids, attention_masks, labels)
 train_sampler = RandomSampler(train_data)
 train_dataloader = DataLoader(train_data, sampler=train_sampler, batch_size=batch_size)
@@ -346,7 +346,8 @@ validation_dataloader = DataLoader(validation_data, sampler=validation_sampler, 
 model = AutoModelForSequenceClassification.from_pretrained(checkpoint_path)
 model.cuda()
 
-optimizer = AdamW(model.parameters(), lr=3e-5, eps=1e-8)
+# optimizer = AdamW(model.parameters(), lr=3e-5, eps=1e-8)
+optimizer = AdamW(model.parameters(), lr=2e-5, eps=1e-5)    # 아직 이게 정확하지 않음
 
 epochs = 3
 
@@ -402,7 +403,6 @@ for i in range(epochs):
     print("  Average training accuracy: {0:.8f}".format(avg_train_accuracy))
     print("  Training epoch took: {:}".format(format_time(time.time() - t0)))
 
-
     print("")
     print("Validating...")
     t0 = time.time()
@@ -433,4 +433,4 @@ for i in range(epochs):
 
     # if np.min(val_losses) == val_losses[-1]:
     print("saving current best checkpoint")
-    torch.save(model.state_dict(), "./data/" + dir_path + str(i+1) + "_codebert-base-mlm_0531.pt")
+    torch.save(model.state_dict(), "./data/" + dir_path + str(i+1) + "_codebert-base-mlm_BM25L_0605.pt")
