@@ -24,6 +24,14 @@ dir_path = 'codebert-mlm/'     # CodeBERTaPy/, graphcodebert/ /codebert-mlm
 checkpoint_path = "microsoft/codebert-base-mlm"
 
 
+def set_seed(seed):
+    random.seed(seed)
+    os.environ['PYTHONHASHSEED'] = str(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed(seed)
+    # torch.backends.cudnn.deterministic = True 연산 속도 감소
+
 # model = RobertaForMaskedLM.from_pretrained("microsoft/codebert-base-mlm")
 # tokenizer = RobertaTokenizer.from_pretrained("microsoft/codebert-base-mlm")
 #
@@ -236,13 +244,21 @@ tokenizer.truncation_side = "left"
 # read saved train and validation data
 # train_data = pd.read_csv("./data/" + "new_dataset/dacon_code_train_data.csv")
 # valid_data = pd.read_csv("./data/" + "new_dataset/dacon_code_valid_data.csv")
-train_data = pd.read_csv("./data/" + "new_dataset_0604/clean_train_data_BM25L.csv")
-valid_data = pd.read_csv("./data/" + "new_dataset_0604/clean_valid_data_BM25L.csv")
+
+
+dacon_train_data = pd.read_csv("./data/" + "new_dataset_0606/mlm_dacon_train_bm25L.csv")
+dacon_valid_data = pd.read_csv("./data/" + "new_dataset_0606/mlm_dacon_valid_bm25L.csv")
+
+codenet_train_data = pd.read_csv("./data/" + "new_dataset_0606/mlm_codenet_train_bm25L.csv")
+codenet_valid_data = pd.read_csv("./data/" + "new_dataset_0606/mlm_codenet_valid_bm25L.csv")
+
+train_data = pd.concat([dacon_train_data, codenet_train_data], axis=0)
+valid_data = pd.concat([dacon_valid_data, codenet_valid_data], axis=0)
 
 
 c1 = train_data['code1'].values
 c2 = train_data['code2'].values
-similar = train_data['similar']
+similar = train_data['similar'].values
 
 N = train_data.shape[0]
 MAX_LEN = 512
@@ -269,9 +285,10 @@ for i in tqdm(range(N), position=0, leave=True):
 #
 # bot.sendMessage(chat_id=chat_id, text="train preprocessing done!")
 
+
 c1 = valid_data['code1'].values
 c2 = valid_data['code2'].values
-similar = valid_data['similar']
+similar = valid_data['similar'].values
 
 N = valid_data.shape[0]
 MAX_LEN = 512
@@ -314,24 +331,26 @@ valid_attention_masks = torch.tensor(valid_attention_masks, dtype=int)
 valid_labels = torch.tensor(valid_labels, dtype=int)
 
 
-torch.save(input_ids, "./data/" + dir_path + 'train_input_ids_BM25L_0605.pt')
-torch.save(attention_masks, "./data/" + dir_path + 'train_attention_masks_BM25L_0605.pt')
-torch.save(labels, "./data/" + dir_path + "train_labels_BM25L_0605.pt")
+torch.save(input_ids, "./data/" + dir_path + 'mlm_train_input_ids_BM25L_0607.pt')
+torch.save(attention_masks, "./data/" + dir_path + 'mlm_train_attention_masks_BM25L_0607.pt')
+torch.save(labels, "./data/" + dir_path + "mlm_train_labels_BM25L_0607.pt")
 
-torch.save(valid_input_ids, "./data/" + dir_path + "valid_input_ids_BM25L_0605.pt")
-torch.save(valid_attention_masks, "./data/" + dir_path + "valid_attention_masks_BM25L_0605.pt")
-torch.save(valid_labels, "./data/" + dir_path + "valid_labels_BM25L_0605.pt")
+torch.save(valid_input_ids, "./data/" + dir_path + "mlm_valid_input_ids_BM25L_0607.pt")
+torch.save(valid_attention_masks, "./data/" + dir_path + "mlm_valid_attention_masks_BM25L_0607.pt")
+torch.save(valid_labels, "./data/" + dir_path + "mlm_valid_labels_BM25L_0607.pt")
 
 
 # load saved models
-# input_ids = torch.load("./data/" + dir_path + 'train_input_ids_0604.pt')
-# attention_masks = torch.load("./data/" + dir_path + 'train_attention_masks_0604.pt')
-# labels = torch.load("./data/" + dir_path + 'train_labels_0604.pt')
+# input_ids = torch.load("./data/" + dir_path + 'mlm_train_input_ids_BM25L_0607.pt')
+# attention_masks = torch.load("./data/" + dir_path + 'mlm_train_attention_masks_BM25L_0607.pt')
+# labels = torch.load("./data/" + dir_path + 'mlm_train_labels_BM25L_0607.pt')
 
-# valid_input_ids = torch.load("./data/" + dir_path + 'valid_input_ids_0604.pt')
-# valid_attention_masks = torch.load("./data/" + dir_path + 'valid_attention_masks_0604.pt')
-# valid_labels = torch.load("./data/" + dir_path + 'valid_labels_0604.pt')
+# valid_input_ids = torch.load("./data/" + dir_path + 'mlm_valid_input_ids_BM25L_0607.pt')
+# valid_attention_masks = torch.load("./data/" + dir_path + 'mlm_valid_attention_masks_BM25L_0607.pt')
+# valid_labels = torch.load("./data/" + dir_path + 'mlm_valid_labels_BM25L_0607.pt')
 
+
+set_seed(42)
 
 batch_size = 96 # for server14= 96, sever12=48
 
@@ -433,4 +452,4 @@ for i in range(epochs):
 
     # if np.min(val_losses) == val_losses[-1]:
     print("saving current best checkpoint")
-    torch.save(model.state_dict(), "./data/" + dir_path + str(i+1) + "_codebert-base-mlm_BM25L_0605.pt")
+    torch.save(model.state_dict(), "./data/" + dir_path + str(i+1) + "_codebert-base-mlm_BM25L_0607.pt")
