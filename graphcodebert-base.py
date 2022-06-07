@@ -16,9 +16,10 @@ import numpy as np
 import pandas as pd
 import os
 
+
 setproctitle("Gyeongmin")
 
-# os.environ["CUDA_VISIBLE_DEVICES"] = "5"
+os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 
 dir_path = 'graphcodebert/'     # CodeBERTaPy/, graphcodebert/
 checkpoint_path = "microsoft/graphcodebert-base"
@@ -245,15 +246,16 @@ tokenizer.truncation_side = "left"
 
 
 # read saved train and validation data
-dacon_train_data = pd.read_csv("./data/" + "new_dataset_0606/graph_dacon_train_bm25L.csv")
-dacon_valid_data = pd.read_csv("./data/" + "new_dataset_0606/graph_dacon_valid_bm25L.csv")
 
-codenet_train_data = pd.read_csv("./data/" + "new_dataset_0606/graph_codenet_train_bm25L.csv")
-codenet_valid_data = pd.read_csv("./data/" + "new_dataset_0606/graph_codenet_valid_bm25L.csv")
+
+dacon_train_data = pd.read_csv("./data/" + "new_dataset_0607/graph_dacon_train_bm25L.csv")
+# dacon_valid_data = pd.read_csv("./data/" + "new_dataset_0607/graph_dacon_valid_bm25L.csv")
+
+codenet_train_data = pd.read_csv("./data/" + "new_dataset_0607/graph_codenet_train_bm25L.csv")
+# codenet_valid_data = pd.read_csv("./data/" + "new_dataset_0607/graph_codenet_valid_bm25L.csv")
 
 train_data = pd.concat([dacon_train_data, codenet_train_data], axis=0)
-valid_data = pd.concat([dacon_valid_data, codenet_valid_data], axis=0)
-
+# valid_data = pd.concat([dacon_valid_data, codenet_valid_data], axis=0)
 
 c1 = train_data['code1'].values
 c2 = train_data['code2'].values
@@ -285,59 +287,49 @@ for i in tqdm(range(N), position=0, leave=True):
 # bot.sendMessage(chat_id=chat_id, text="train preprocessing done!")
 
 
-c1 = valid_data['code1'].values
-c2 = valid_data['code2'].values
-similar = valid_data['similar'].values
-
-N = valid_data.shape[0]
-
-MAX_LEN = 512
-
-valid_input_ids = np.zeros((N, MAX_LEN),dtype=int)
-valid_attention_masks = np.zeros((N, MAX_LEN),dtype=int)
-valid_labels = np.zeros((N),dtype=int)
-
-
-def flat_accuracy(preds, labels):
-    pred_flat = np.argmax(preds, axis=1).flatten()
-    labels_flat = labels.flatten()
-    return np.sum(pred_flat == labels_flat) / len(labels_flat)
-
-def format_time(elapsed):
-    elapsed_rounded = int(round((elapsed)))
-    return str(datetime.timedelta(seconds=elapsed_rounded))
+# c1 = valid_data['code1'].values
+# c2 = valid_data['code2'].values
+# similar = valid_data['similar'].values
+#
+# N = valid_data.shape[0]
+#
+# MAX_LEN = 512
+#
+# valid_input_ids = np.zeros((N, MAX_LEN),dtype=int)
+# valid_attention_masks = np.zeros((N, MAX_LEN),dtype=int)
+# valid_labels = np.zeros((N),dtype=int)
 
 
-
-for i in tqdm(range(N), position=0, leave=True):
-    try:
-        cur_c1 = str(c1[i])
-        cur_c2 = str(c2[i])
-        encoded_input = tokenizer(cur_c1, cur_c2, return_tensors='pt', max_length=512, padding='max_length', truncation=True)
-        valid_input_ids[i,] = encoded_input['input_ids']
-        valid_attention_masks[i,] = encoded_input['attention_mask']
-        valid_labels[i] = similar[i]
-    except Exception as e:
-        print(e)
-        pass
+# for i in tqdm(range(N), position=0, leave=True):
+#     try:
+#         cur_c1 = str(c1[i])
+#         cur_c2 = str(c2[i])
+#         encoded_input = tokenizer(cur_c1, cur_c2, return_tensors='pt', max_length=512, padding='max_length', truncation=True)
+#         valid_input_ids[i,] = encoded_input['input_ids']
+#         valid_attention_masks[i,] = encoded_input['attention_mask']
+#         valid_labels[i] = similar[i]
+#     except Exception as e:
+#         print(e)
+#         pass
 
 
 input_ids = torch.tensor(input_ids, dtype=int)
 attention_masks = torch.tensor(attention_masks, dtype=int)
 labels = torch.tensor(labels, dtype=int)
 
-valid_input_ids = torch.tensor(valid_input_ids, dtype=int)
-valid_attention_masks = torch.tensor(valid_attention_masks, dtype=int)
-valid_labels = torch.tensor(valid_labels, dtype=int)
-
+# valid_input_ids = torch.tensor(valid_input_ids, dtype=int)
+# valid_attention_masks = torch.tensor(valid_attention_masks, dtype=int)
+# valid_labels = torch.tensor(valid_labels, dtype=int)
 
 torch.save(input_ids, "./data/" + dir_path + 'graph_train_input_ids_BM25L_0607.pt')
 torch.save(attention_masks, "./data/" + dir_path + 'graph_train_attention_masks_BM25L_0607.pt')
 torch.save(labels, "./data/" + dir_path + "graph_train_labels_BM25L_0607.pt")
 
-torch.save(valid_input_ids, "./data/" + dir_path + "graph_valid_input_ids_BM25L_0607.pt")
-torch.save(valid_attention_masks, "./data/" + dir_path + "graph_valid_attention_masks_BM25L_0607.pt")
-torch.save(valid_labels, "./data/" + dir_path + "graph_valid_labels_BM25L_0607.pt")
+# torch.save(valid_input_ids, "./data/" + dir_path + "graph_valid_input_ids_BM25L_0607.pt")
+# torch.save(valid_attention_masks, "./data/" + dir_path + "graph_valid_attention_masks_BM25L_0607.pt")
+# torch.save(valid_labels, "./data/" + dir_path + "graph_valid_labels_BM25L_0607.pt")
+
+exit()
 
 
 # load saved models
@@ -373,6 +365,14 @@ scheduler = get_linear_schedule_with_warmup(optimizer,
                                             num_warmup_steps=0,
                                             num_training_steps=total_steps)
 
+def flat_accuracy(preds, labels):
+    pred_flat = np.argmax(preds, axis=1).flatten()
+    labels_flat = labels.flatten()
+    return np.sum(pred_flat == labels_flat) / len(labels_flat)
+
+def format_time(elapsed):
+    elapsed_rounded = int(round((elapsed)))
+    return str(datetime.timedelta(seconds=elapsed_rounded))
 
 device = torch.device("cuda")
 loss_f = nn.CrossEntropyLoss()
