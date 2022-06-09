@@ -18,11 +18,10 @@ import os
 
 setproctitle("Gyeongmin")
 
-os.environ["CUDA_VISIBLE_DEVICES"] = "1"
+# os.environ["CUDA_VISIBLE_DEVICES"] = "1"
 
-dir_path = 'codebert-mlm/'     # CodeBERTaPy/, graphcodebert/ /codebert-mlm
-checkpoint_path = "microsoft/codebert-base-mlm"
-
+dir_path = 'CodeBERTaPy/'     # CodeBERTaPy/, graphcodebert/ /codebert-mlm mrm8488/CodeBERTaPy
+checkpoint_path = "mrm8488/CodeBERTaPy"
 
 def set_seed(seed):
     random.seed(seed)
@@ -31,20 +30,6 @@ def set_seed(seed):
     torch.manual_seed(seed)
     torch.cuda.manual_seed(seed)
     # torch.backends.cudnn.deterministic = True 연산 속도 감소
-
-# model = RobertaForMaskedLM.from_pretrained("microsoft/codebert-base-mlm")
-# tokenizer = RobertaTokenizer.from_pretrained("microsoft/codebert-base-mlm")
-#
-# CODE = "if (x is not None) <mask> (x>1)"
-# fill_mask = pipeline('fill-mask', model=model, tokenizer=tokenizer)
-#
-# outputs = fill_mask(CODE)
-# print(outputs)
-
-# train = pd.read_csv("./data/sample_train.csv")
-# test = pd.read_csv("./data/test.csv")
-
-
 
 # def preprocess_script(script):
 #     '''
@@ -71,14 +56,17 @@ def set_seed(seed):
 #     return preprocessed_script
 #
 #
+#
+#
 # code_folder = './data/code'
 # problem_folders = os.listdir(code_folder)
 #
 # preproc_scripts = []
 # problem_nums = []
 #
+#
 # for problem_folder in tqdm(problem_folders):
-#     scripts = os.listdir(os.path.join(code_folder, problem_folder))
+#     scripts = os.listdir(os.path.join(code_folder,problem_folder))
 #     problem_num = scripts[0].split('_')[0]
 #     for script in scripts:
 #         script_file = os.path.join(code_folder,problem_folder,script)
@@ -100,6 +88,8 @@ tokenizer.truncation_side = "left"
 # ndf.describe()
 #
 #
+#
+#
 # train_df, valid_df, train_label, valid_label = train_test_split(
 #         ndf,
 #         ndf['problem_num'],
@@ -115,18 +105,18 @@ tokenizer.truncation_side = "left"
 # codes = train_df['code'].to_list()
 # problems = train_df['problem_num'].unique().tolist()
 # problems.sort()
-#
+
 # tokenized_corpus = [tokenizer.tokenize(code) for code in codes]
 # bm25 = BM25Okapi(tokenized_corpus)
-#
-#
+
+
 # total_positive_pairs = []
 # total_negative_pairs = []
 #
 #
 # for problem in tqdm(problems):
 #     solution_codes = train_df[train_df['problem_num'] == problem]['code']
-#     positive_pairs = list(combinations(solution_codes.to_list(), 2))
+#     positive_pairs = list(combinations(solution_codes.to_list(),2))
 #
 #     solution_codes_indices = solution_codes.index.to_list()
 #     negative_pairs = []
@@ -151,8 +141,8 @@ tokenizer.truncation_side = "left"
 #     total_positive_pairs.extend(positive_pairs)
 #     total_negative_pairs.extend(negative_pairs)
 #
-# pos_code1 = list(map(lambda x:x[0], total_positive_pairs))
-# pos_code2 = list(map(lambda x:x[1], total_positive_pairs))
+# pos_code1 = list(map(lambda x:x[0],total_positive_pairs))
+# pos_code2 = list(map(lambda x:x[1],total_positive_pairs))
 #
 # neg_code1 = list(map(lambda x:x[0],total_negative_pairs))
 # neg_code2 = list(map(lambda x:x[1],total_negative_pairs))
@@ -174,7 +164,7 @@ tokenizer.truncation_side = "left"
 #
 # pair_data = pair_data.sample(frac=1).reset_index(drop=True)
 #
-# pair_data.to_csv('./data/' + dir_path + 'train_data.csv', index=False)
+# pair_data.to_csv('./data/train_data.csv',index=False)
 #
 #
 # # repeat for validation
@@ -190,7 +180,7 @@ tokenizer.truncation_side = "left"
 #
 # for problem in tqdm(problems):
 #     solution_codes = valid_df[valid_df['problem_num'] == problem]['code']
-#     positive_pairs = list(combinations(solution_codes.to_list(), 2))
+#     positive_pairs = list(combinations(solution_codes.to_list(),2))
 #
 #     solution_codes_indices = solution_codes.index.to_list()
 #     negative_pairs = []
@@ -230,32 +220,26 @@ tokenizer.truncation_side = "left"
 # total_code2 = pos_code2
 # pos_label.extend(neg_label)
 # total_label = pos_label
-#
 # pair_data = pd.DataFrame(data={
 #     'code1':total_code1,
 #     'code2':total_code2,
 #     'similar':total_label
 # })
-#
 # pair_data = pair_data.sample(frac=1).reset_index(drop=True)
 #
-# pair_data.to_csv('./data/' + dir_path + 'valid_data.csv', index=False)
+# pair_data.to_csv('./data/valid_data.csv',index=False)
 
 
 # read saved train and validation data
-dacon_train_data = pd.read_csv("./data/" + "new_dataset_0607/mlm_dacon_train_bm25L.csv")
-dacon_valid_data = pd.read_csv("./data/" + "new_dataset_0607/mlm_dacon_valid_bm25L.csv")
 
-codenet_train_data = pd.read_csv("./data/" + "new_dataset_0607/mlm_codenet_train_bm25L.csv")
-codenet_valid_data = pd.read_csv("./data/" + "new_dataset_0607/mlm_codenet_valid_bm25L.csv")
+dacon_train_data = pd.read_csv("./data/" + "new_dataset_0607/graph_dacon_train_bm25L.csv")
+dacon_valid_data = pd.read_csv("./data/" + "new_dataset_0607/graph_dacon_valid_bm25L.csv")
+
+codenet_train_data = pd.read_csv("./data/" + "new_dataset_0607/graph_codenet_train_bm25L.csv")
+codenet_valid_data = pd.read_csv("./data/" + "new_dataset_0607/graph_codenet_valid_bm25L.csv")
 
 train_data = pd.concat([dacon_train_data, codenet_train_data], axis=0)
 valid_data = pd.concat([dacon_valid_data, codenet_valid_data], axis=0)
-
-
-"""If you only train dacon"""
-# train_data = pd.read_csv("./data/" + "new_dataset_0607/mlm_dacon_train_bm25L.csv")
-# valid_data = pd.read_csv("./data/" + "new_dataset_0607/mlm_dacon_valid_bm25L.csv")
 
 
 c1 = train_data['code1'].values
@@ -280,13 +264,6 @@ for i in tqdm(range(N), position=0, leave=True):
     except Exception as e:
         print(e)
         pass
-#
-# # tel_token = "5059732158:AAE87TaReNbDKH3_Fy-CAYCUuIO2qiUyK2I"
-# # chat_id = 1720119057
-# # bot = telegram.Bot(token=tel_token)
-# #
-# # bot.sendMessage(chat_id=chat_id, text="train preprocessing done!")
-
 
 c1 = valid_data['code1'].values
 c2 = valid_data['code2'].values
@@ -298,6 +275,16 @@ MAX_LEN = 512
 valid_input_ids = np.zeros((N, MAX_LEN),dtype=int)
 valid_attention_masks = np.zeros((N, MAX_LEN),dtype=int)
 valid_labels = np.zeros((N),dtype=int)
+
+
+def flat_accuracy(preds, labels):
+    pred_flat = np.argmax(preds, axis=1).flatten()
+    labels_flat = labels.flatten()
+    return np.sum(pred_flat == labels_flat) / len(labels_flat)
+
+def format_time(elapsed):
+    elapsed_rounded = int(round((elapsed)))
+    return str(datetime.timedelta(seconds=elapsed_rounded))
 
 
 for i in tqdm(range(N), position=0, leave=True):
@@ -312,6 +299,7 @@ for i in tqdm(range(N), position=0, leave=True):
         print(e)
         pass
 
+
 print("\n\nMake tensor\n")
 input_ids = torch.tensor(input_ids, dtype=int)
 attention_masks = torch.tensor(attention_masks, dtype=int)
@@ -322,28 +310,29 @@ valid_attention_masks = torch.tensor(valid_attention_masks, dtype=int)
 valid_labels = torch.tensor(valid_labels, dtype=int)
 
 
-torch.save(input_ids, "./data/" + dir_path + 'mlm_mixed_train_input_ids_BM25L_0608.pt')
-torch.save(attention_masks, "./data/" + dir_path + 'mlm_mixed_train_attention_masks_BM25L_0608.pt')
-torch.save(labels, "./data/" + dir_path + "mlm_mixed_train_labels_BM25L_0608.pt")
+torch.save(input_ids, "./data/" + dir_path + 'codebertapy_mixed_train_input_ids_BM25L_0608.pt')
+torch.save(attention_masks, "./data/" + dir_path + 'codebertapy_mixed_train_attention_masks_BM25L_0608.pt')
+torch.save(labels, "./data/" + dir_path + 'codebertapy_mixed_train_labels_BM25L_0608.pt')
 
-torch.save(valid_input_ids, "./data/" + dir_path + "mlm_mixed_valid_input_ids_BM25L_0608.pt")
-torch.save(valid_attention_masks, "./data/" + dir_path + "mlm_mixed_valid_attention_masks_BM25L_0608.pt")
-torch.save(valid_labels, "./data/" + dir_path + "mlm_mixed_valid_labels_BM25L_0608.pt")
+torch.save(valid_input_ids, "./data/" + dir_path + 'codebertapy_mixed_valid_input_ids_BM25L_0608.pt')
+torch.save(valid_attention_masks, "./data/" + dir_path + 'codebertapy_mixed_valid_attention_masks_BM25L_0608.pt')
+torch.save(valid_labels, "./data/" + dir_path + "codebertapy_mixed_valid_labels_BM25L_0608.pt")
+
 
 # load saved models
-# input_ids = torch.load("./data/" + dir_path + 'mlm_train_input_ids_BM25L_0608.pt')
-# attention_masks = torch.load("./data/" + dir_path + 'mlm_train_attention_masks_BM25L_0608.pt')
-# labels = torch.load("./data/" + dir_path + 'mlm_train_labels_BM25L_0608.pt')
-
-# valid_input_ids = torch.load("./data/" + dir_path + 'mlm_valid_input_ids_BM25L_0608.pt')
-# valid_attention_masks = torch.load("./data/" + dir_path + 'mlm_valid_attention_masks_BM25L_0608.pt')
-# valid_labels = torch.load("./data/" + dir_path + 'mlm_valid_labels_BM25L_0608.pt')
+# input_ids = torch.load("./data/" + dir_path + 'codebertapy_mixed_train_input_ids_BM25L_0608.pt')
+# attention_masks = torch.load("./data/" + dir_path + 'codebertapy_mixed_train_attention_masks_BM25L_0608.pt')
+# labels = torch.load("./data/" + dir_path + 'codebertapy_mixed_train_labels_BM25L_0608.pt')
+#
+# valid_input_ids = torch.load("./data/" + dir_path + 'codebertapy_mixed_valid_input_ids_BM25L_0608.pt')
+# valid_attention_masks = torch.load("./data/" + dir_path + 'codebertapy_mixed_valid_attention_masks_BM25L_0608.pt')
+# valid_labels = torch.load("./data/" + dir_path + 'codebertapy_mixed_valid_labels_BM25L_0608.pt')
 
 exit()
 
 set_seed(42)
 
-batch_size = 96 # for server14= 96, sever12=48
+batch_size = 192 # for server14= 192, sever12=96
 
 train_data = TensorDataset(input_ids, attention_masks, labels)
 train_sampler = RandomSampler(train_data)
@@ -367,14 +356,6 @@ scheduler = get_linear_schedule_with_warmup(optimizer,
                                             num_warmup_steps=0,
                                             num_training_steps=total_steps)
 
-def flat_accuracy(preds, labels):
-    pred_flat = np.argmax(preds, axis=1).flatten()
-    labels_flat = labels.flatten()
-    return np.sum(pred_flat == labels_flat) / len(labels_flat)
-
-def format_time(elapsed):
-    elapsed_rounded = int(round((elapsed)))
-    return str(datetime.timedelta(seconds=elapsed_rounded))
 
 device = torch.device("cuda")
 loss_f = nn.CrossEntropyLoss()
@@ -421,6 +402,7 @@ for i in range(epochs):
     print("  Average training accuracy: {0:.8f}".format(avg_train_accuracy))
     print("  Training epoch took: {:}".format(format_time(time.time() - t0)))
 
+
     print("")
     print("Validating...")
     t0 = time.time()
@@ -430,8 +412,8 @@ for i in range(epochs):
         batch = tuple(t.to(device) for t in batch)
         b_input_ids, b_input_mask, b_labels = batch
         with torch.no_grad():
-            outputs = model(b_input_ids, attention_mask=b_input_mask)
-
+            outputs = model(b_input_ids,
+                            attention_mask=b_input_mask)
         logits = outputs[0]
         logits = logits.detach().cpu()
         label_ids = b_labels.detach().cpu()
@@ -449,6 +431,10 @@ for i in range(epochs):
     print("  Average validation accuracy: {0:.8f}".format(avg_val_accuracy))
     print("  Training epoch took: {:}".format(format_time(time.time() - t0)))
 
+    # bot.sendMessage(chat_id=chat_id, text="Epoch {} Done!".format(i+1))
+    # bot.sendMessage(chat_id=chat_id, text="avg validation loss = {}".format(avg_val_loss))
+    # bot.sendMessage(chat_id=chat_id, text="avg validation accuracy = {}%".format(avg_val_accuracy))
+
     # if np.min(val_losses) == val_losses[-1]:
     print("saving current best checkpoint")
-    torch.save(model.state_dict(), "./data/" + dir_path + str(i+1) + "_mixed_codebert-base-mlm_BM25L_0608.pt")
+    torch.save(model.state_dict(), "./data/" + dir_path + str(i+1) + "_dacon_codebertapy_0608.pt")
