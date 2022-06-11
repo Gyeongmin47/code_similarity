@@ -1,0 +1,13 @@
+CUDA_VISIBLE_DEVICES=0 python code_submission.py \
+--seed 42 \
+--learning_rate 2e-5 \
+--eps 1e-5 \
+--epochs 3 \
+--batch_size 32 \
+--test_batch_size 1048 \
+--save_tensor True \
+--mode train \
+--dir_path graphcodebert \
+--model_name graphcodebert \
+--process_name code_similarity \
+--checkpoint_path microsoft/graphcodebert-base
