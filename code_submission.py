@@ -17,10 +17,155 @@ import os, re
 import argparse
 
 
-# 민석님이 해주실 부분
-def data_preprocess():
-    pass
 
+''' 아무 내용이 없는 줄은 버린다 '''
+def get_rid_of_empty(c):
+    ret = []
+    splitted = c.split('\n')
+    for s in splitted:
+        if len(s.strip()) > 0:
+            ret.append(s)
+    return '\n'.join(ret)
+
+
+''' 데이터 클리닝 함수 '''
+def clean_data(script, data_type="dir"):
+    if data_type == "dir":
+        with open(script, 'r', encoding='utf-8') as file:
+            lines = file.readlines()
+            preproc_lines = []
+            for line in lines:
+                if line.lstrip().startswith('#'):
+                    continue
+                line = line.rstrip()
+                if '#' in line:
+                    line = line[:line.index('#')]
+                line = line.replace('\n', '')
+                line = line.replace('    ', '\t')
+                if line == '':
+                    continue
+                preproc_lines.append(line)
+    elif data_type == "file":
+        lines = script.split('\n')
+        preproc_lines = []
+        for line in lines:
+            if line.lstrip().startswith('#'):
+                continue
+            line = line.rstrip()
+            if '#' in line:
+                line = line[:line.index('#')]
+            line = line.replace('\n', '')
+            line = line.replace('    ', '\t')
+            if line == '':
+                continue
+            preproc_lines.append(line)
+
+    preprocessed_script = '\n'.join(preproc_lines)
+    preprocessed_script = re.sub('\"\"\"([^\"]*)\"\"\"', "", preprocessed_script)
+    preprocessed_script = re.sub('\'\'\'([^\"]*)\'\'\'', "", preprocessed_script)
+    preprocessed_script = re.sub(r'\'\w+', '', preprocessed_script)
+    preprocessed_script = re.sub(r'\w*\d+\w*', '', preprocessed_script)
+    preprocessed_script = re.sub(r'\s{2,}', ' ', preprocessed_script)
+    preprocessed_script = re.sub(r'\s[^\w\s]\s', '', preprocessed_script)
+
+    ''' 극소수지만 데이터 몇개는 완성되지 않은 주석들이 있었습니다 '''
+    splitted = preprocessed_script.split('\n')
+    found_triple = False
+    start_idx, end_idx = -1, -1
+    for i in range(len(splitted)):
+        if found_triple == False and '\'\'\'' in splitted[i]:
+            found_triple = True
+            start_idx = i
+        elif found_triple == True and '\'\'\'' in splitted[i]:
+            end_idx = i
+    if start_idx != -1 and end_idx != -1:
+        splitted = splitted[:start_idx] + splitted[end_idx + 1:]
+    elif start_idx != -1 and end_idx == -1:
+        splitted = splitted[start_idx + 1:]
+
+    found_triple = False
+    start_idx, end_idx = -1, -1
+    for i in range(len(splitted)):
+        if found_triple == False and '\"\"\"' in splitted[i]:
+            found_triple = True
+            start_idx = i
+        elif found_triple == True and '\"\"\"' in splitted[i]:
+            end_idx = i
+    if start_idx != -1 and end_idx != -1:
+        splitted = splitted[:start_idx] + splitted[end_idx + 1:]
+    elif start_idx != -1 and end_idx == -1:
+        splitted = splitted[start_idx + 1:]
+
+    preprocessed_script = '\n'.join(splitted)
+    preprocessed_script = get_rid_of_empty(preprocessed_script)
+    return preprocessed_script
+
+
+''' positive, negative 페어 생성 함수 '''
+def get_pairs(input_df, tokenizer):
+    codes = input_df['code'].to_list()
+    problems = input_df['problem_num'].unique().tolist()
+    problems.sort()
+
+    tokenized_corpus = [tokenizer.tokenize(code) for code in codes]
+    bm25 = BM25L(tokenized_corpus)
+
+    total_positive_pairs = []
+    total_negative_pairs = []
+
+    for problem in tqdm(problems):
+        solution_codes = input_df[input_df['problem_num'] == problem]['code']
+        positive_pairs = list(combinations(solution_codes.to_list(),2))
+
+        solution_codes_indices = solution_codes.index.to_list()
+        negative_pairs = []
+
+        first_tokenized_code = tokenizer.tokenize(positive_pairs[0][0])
+        negative_code_scores = bm25.get_scores(first_tokenized_code)
+        negative_code_ranking = negative_code_scores.argsort()[::-1] # 내림차순
+        ranking_idx = 0
+
+        for solution_code in solution_codes:
+            negative_solutions = []
+            while len(negative_solutions) < len(positive_pairs) // len(solution_codes):
+                high_score_idx = negative_code_ranking[ranking_idx]
+
+                if high_score_idx not in solution_codes_indices:
+                    negative_solutions.append(input_df['code'].iloc[high_score_idx])
+                ranking_idx += 1
+
+            for negative_solution in negative_solutions:
+                negative_pairs.append((solution_code, negative_solution))
+
+        total_positive_pairs.extend(positive_pairs)
+        total_negative_pairs.extend(negative_pairs)
+
+    pos_code1 = list(map(lambda x:x[0],total_positive_pairs))
+    pos_code2 = list(map(lambda x:x[1],total_positive_pairs))
+
+    neg_code1 = list(map(lambda x:x[0],total_negative_pairs))
+    neg_code2 = list(map(lambda x:x[1],total_negative_pairs))
+
+    pos_label = [1]*len(pos_code1)
+    neg_label = [0]*len(neg_code1)
+
+    pos_code1.extend(neg_code1)
+    total_code1 = pos_code1
+    pos_code2.extend(neg_code2)
+    total_code2 = pos_code2
+    pos_label.extend(neg_label)
+    total_label = pos_label
+    pair_data = pd.DataFrame(data={
+        'code1':total_code1,
+        'code2':total_code2,
+        'similar':total_label
+    })
+    pair_data = pair_data.sample(frac=1).reset_index(drop=True)
+    return pair_data
+
+
+""" 전체 데이터 전처리 함수 """
+def data_preprocess(args):
     """ Data preprocess """
     # train, valid, test 에 대한 전처리 추가해주시면 감사하겠습니다 :)
 
@@ -34,8 +179,167 @@ def data_preprocess():
     test_data = pd.read_csv("./data/new_dataset_0604/processed_test.csv")
     """
 
+    # 데이콘이 제공해준 학습 코드 데이터 데이터프레임 만들기
+    # 베스이    code_folder = "code"  # 데이콘이 제공해준 학습 데이터 파일의 경로
+    problem_folders = os.listdir(code_folder)
+    preproc_scripts = []
+    problem_nums = []
+    for problem_folder in tqdm(problem_folders):
+        scripts = os.listdir(os.path.join(code_folder, problem_folder))
+        problem_num = scripts[0].split('_')[0]
+        for script in scripts:
+            script_file = os.path.join(code_folder, problem_folder, script)
+            preprocessed_script = clean_data(script_file, data_type="dir")
+            preproc_scripts.append(preprocessed_script)
+        problem_nums.extend([problem_num] * len(scripts))
+    train_df = pd.DataFrame(data={'code': preproc_scripts, 'problem_num': problem_nums})
 
+    # 데이콘이 제공해준 테스트 코드 데이터 데이터프레임 만들기
+    test_df = pd.read_csv("test.csv")
+    code1 = test_df['code1'].values
+    code2 = test_df['code2'].values
+    processed_code1 = []
+    processed_code2 = []
+    for i in tqdm(range(len(code1))):
+        processed_c1 = clean_data(code1[i], data_type="file")
+        processed_c2 = clean_data(code2[i], data_type="file")
+        processed_code1.append(processed_c1)
+        processed_code2.append(processed_c2)
+    processed_test = pd.DataFrame(list(zip(processed_code1, processed_code2)),
+                                  columns=["code1", "code2"])
 
+    # IBM의 CodeNet으로 추가 코드 학습/검증 데이터 데이터프레임 만들기
+    code_folder = "Project_CodeNet_Python800"  # CodeNet 데이터 경로
+    problem_folders = os.listdir(code_folder)
+    preproc_scripts = []
+    problem_nums = []
+    for problem_folder in tqdm(problem_folders):
+        scripts = os.listdir(os.path.join(code_folder, problem_folder))
+        problem_num = int(problem_folder.split('p')[1])
+        problem_num = 'problem' + str(problem_num)
+        for script in scripts:
+            script_file = os.path.join(code_folder, problem_folder, script)
+            preprocessed_script = clean_data(script_file)
+            preproc_scripts.append(preprocessed_script)
+        problem_nums.extend([problem_num] * len(scripts))
+    codenet_df = pd.DataFrame(data={'code': preproc_scripts, 'problem_num': problem_nums})
+
+    # 추가 codenet 데이터에서 테스트셋과 겹치는 데이터가 있다는걸 관찰했다.
+    # 1차 필터링을 진행한다.
+    # codenet_df에서 test_df의 데이터와 겹치는 녀석들을 필터링해준다.
+    # 1차 필터링은 단순 set (hash table)을 이용해서 거의 다 필터링해준다. 매우 꼼꼼하게 진행하기 위해 총 3단계 필터링을 거쳤다.
+    dacon_codes = np.concatenate([train_df['code'].values,
+                                  test_df['code1'].values, test_df['code2'].values])
+    dacon_codes_set = set()
+
+    for i in tqdm(range(len(dacon_codes))):
+        dacon_codes_set.add(dacon_codes[i])
+    usable_codes = []
+    usable_problem_nums = []
+    codenet_codes = codenet_df['code'].values
+    problem_nums = codenet_df['problem_num'].values
+
+    for i in tqdm(range(len(codenet_codes))):
+        if codenet_codes[i] not in dacon_codes_set:
+            usable_codes.append(codenet_codes[i])
+            usable_problem_nums.append(problem_nums[i])
+    filtered_codenet_df = pd.DataFrame(data={'code': usable_codes,
+                                             'problem_num': usable_problem_nums})
+
+    # 데이터 사이즈가 매우 커서 이렇게 완성된 filtered_codenet_df에서 50%의 데이터만 이용해서 학습에 사용한다.
+    filtered_codenet_df = filtered_codenet_df.sample(frac=0.5, random_state=42)
+
+    # 2차 필터링을 진행해준다.
+    # 1차때 trailing space 등의 이유로 set 방법으로 완전하게 걸러지지 않은 녀석들을 걸러주는게 목적이다.
+    # 이걸 위해서 코드 문자열에 존재하는 newline들을 전부 이어붙히고 앞뒤로 존재하는 공백과 newline들을 없앤다.
+    # 이후 이렇게 전처리된 test code와 codenet code 문자열들을 각각 set에 넣고 intersection을 통해 겹치는걸 찾는다.
+    def simplify(x):
+        return ''.join(x.split('\n')).rstrip(' ').strip()
+
+    codenet_codes = filtered_codenet_df['code'].values
+    codenet_problem_nums = filtered_codenet_df['problem_num'].values
+    test_codes1 = test['code1'].values
+    test_codes2 = test['code2'].values
+    test_codes = np.concatenate([test_codes1, test_codes2])
+    codenet_set = set()
+    for i in tqdm(range(len(codenet_codes))):
+        codenet_set.add(simplify(codenet_codes[i]))
+    test_set = set()
+    for i in tqdm(range(len(test_codes))):
+        test_set.add(simplify(test_codes[i]))
+    intersection = codenet_set.intersection(test_set)
+    usable_codenet_filterd, usable_codenet_filtered_problems = [], []
+    for i in tqdm(range(len(codenet_codes))):
+        if simplify(codenet_codes[i]) not in intersection:
+            usable_codenet_filtered.append(codenet_codes[i])
+            usable_codenet_filtered_problems.append(codenet_problem_nums[i])
+    filtered_codenet_df = pd.DataFrame(data={'code': usable_codenet_filtered,
+                                             'problem_num': usable_codenet_filterd_problems})
+
+    # 3차 필터링을 진행해준다.
+    # 2차 필터링 이후로 test set에 포함된 데이터가 추가 데이터에서 거의 다 제거되었겠지만
+    # 확실하게 전부 제거해주기 위해 exhaustive search를 최종적으로 남아있는 test셋의 흔적들을 없애버립니다.
+    codenet_codes = filtered_codenet_df['code'].values
+    problem_nums = filtered_codenet_df['problem_num'].values
+    usable_codenet_filtered, usable_codenet_filtered_problems = [], []
+    for i in tqdm(range(len(codenet_codes)), position=0, leave=True):
+        usable = True
+        if codenet_codes[i] in test_set:
+            continue
+        else:
+            for s in test_set:
+                if len(s) > 0 and len(codenet_codes[i]) > 0 and ((codenet_codes[i] in s) or (s in codenet_codes[i])):
+                    usable = False
+                    break
+        if usable == True:
+            usable_codenet_filterd.append(codenet_codes[i])
+            usable_codenet_filtered_problems.append(problem_nums[i])
+
+    filtered_codenet_df = pd.DataFrame(data={'code': usable_codenet_filtered,
+                                             'problem_num': usable_codenet_filterd_problems})
+
+    # 데이터 프레임을 만들었으니 이제 train/val split을 진행한다.
+    # 이후에 positive, negative pairs를 생성한다.
+    # 청소님의 코드를 참고해서 hard negative pair를 생성하는데 BM25대신 BM25L을 사용한다.
+    # tokenizer는 왼쪽부터 truncation을 진행하게해서 truncation이 필요할때는 코드의 끝 부분들을 이용하게 만든다.
+    dacon_train_df, dacon_valid_df, dacon_train_label, dacon_valid_label = train_test_split(
+        train_df,
+        train_df['problem_num'],
+        random_state=args.seed,
+        test_size=0.1,
+        stratify=full_df['problem_num']
+    )
+    dacon_train_df = dacon_train_df.reset_index(drop=True)
+    dacon_valid_df = dacon_valid_df.reset_index(drop=True)
+
+    tokenizer = AutoTokenizer.from_pretrained(args.checkpoint_path)
+    tokenizer.truncation_side = 'left'
+
+    dacon_train_bm25L = get_pairs(dacon_train_df, tokenizer)
+    dacon_valid_bm25L = get_pairs(dacon_valid_df, tokenizer)
+
+    # 생성된 데이터 저장
+    dacon_train_bm25L.to_csv("./data/" + "new_dataset_0607/graph_dacon_train_bm25L.csv", index=False)
+    dacon_valid_bm25L.to_csv("./data/" + "new_dataset_0607/graph_dacon_valid_bm25L.csv", index=False)
+    processed_test.to_csv("./data/new_dataset_0604/processed_test.csv", index=False)
+
+    codenet_train_df, codenet_valid_df, codenet_train_label, codenet_valid_label = train_test_split(
+        filtered_codenet_df,
+        filtered_codenet_df['problem_num'],
+        random_state=args.seed,
+        test_size=0.1,
+        stratify=full_df['problem_num']
+    )
+    codenet_train_df = codenet_train_df.reset_index(drop=True)
+    codenet_valid_df = codenet_valid_df.reset_index(drop=True)
+
+    codenet_train_bm25L = get_pairs(codenet_train_df, tokenizer)
+    codenet_valid_bm25L = get_pairs(codenet_valid_df, tokenizer)
+    # 생성된 데이터 저장
+    codenet_train_bm25L.to_csv("./data/" + "new_dataset_0607/graph_codenet_train_bm25L.csv",
+                               index=False)
+    codenet_valid_bm25L.to_csv("./data/" + "new_dataset_0607/graph_codenet_valid_bm25L.csv",
+                               index=False)
 
 
 def set_seed(args):
@@ -44,6 +348,7 @@ def set_seed(args):
     np.random.seed(args.seed)
     torch.manual_seed(args.seed)
     torch.cuda.manual_seed(args.seed)
+
 
 def train_model(args):
 
