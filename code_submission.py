@@ -17,8 +17,7 @@ import os, re
 import argparse
 
 
-
-''' 아무 내용이 없는 줄은 버린다 '''
+''' 아무 내용이 없는 줄은 제거합니다. '''
 def get_rid_of_empty(c):
     ret = []
     splitted = c.split('\n')
@@ -28,7 +27,7 @@ def get_rid_of_empty(c):
     return '\n'.join(ret)
 
 
-''' 데이터 클리닝 함수 '''
+''' 데이터 클리닝 '''
 def clean_data(script, data_type="dir"):
     if data_type == "dir":
         with open(script, 'r', encoding='utf-8') as file:
@@ -45,6 +44,7 @@ def clean_data(script, data_type="dir"):
                 if line == '':
                     continue
                 preproc_lines.append(line)
+
     elif data_type == "file":
         lines = script.split('\n')
         preproc_lines = []
@@ -163,13 +163,9 @@ def get_pairs(input_df, tokenizer):
     pair_data = pair_data.sample(frac=1).reset_index(drop=True)
     return pair_data
 
-
-""" 전체 데이터 전처리 함수 """
 def data_preprocess(args):
-    """ Data preprocess """
-    # train, valid, test 에 대한 전처리 추가해주시면 감사하겠습니다 :)
-
-    # 아래에서 호출은 다음과 같이 진행합니다.
+    """ Data preprocess
+    train, valid, test에 대한 전처리를 수행하고, 이 과정에서 결과적으로 아래의 파일명이 생성됩니다."""
 
     """
     dacon_train_data = pd.read_csv("./data/" + "new_dataset_0607/graph_dacon_train_bm25L.csv")
@@ -180,10 +176,11 @@ def data_preprocess(args):
     """
 
     # 데이콘이 제공해준 학습 코드 데이터 데이터프레임 만들기
-    # 베스이    code_folder = "code"  # 데이콘이 제공해준 학습 데이터 파일의 경로
+    code_folder = "code"  # 데이콘이 제공해준 학습 데이터 파일의 경로
     problem_folders = os.listdir(code_folder)
     preproc_scripts = []
     problem_nums = []
+
     for problem_folder in tqdm(problem_folders):
         scripts = os.listdir(os.path.join(code_folder, problem_folder))
         problem_num = scripts[0].split('_')[0]
@@ -205,8 +202,7 @@ def data_preprocess(args):
         processed_c2 = clean_data(code2[i], data_type="file")
         processed_code1.append(processed_c1)
         processed_code2.append(processed_c2)
-    processed_test = pd.DataFrame(list(zip(processed_code1, processed_code2)),
-                                  columns=["code1", "code2"])
+    processed_test = pd.DataFrame(list(zip(processed_code1, processed_code2)), columns=["code1", "code2"])
 
     # IBM의 CodeNet으로 추가 코드 학습/검증 데이터 데이터프레임 만들기
     code_folder = "Project_CodeNet_Python800"  # CodeNet 데이터 경로
@@ -224,12 +220,19 @@ def data_preprocess(args):
         problem_nums.extend([problem_num] * len(scripts))
     codenet_df = pd.DataFrame(data={'code': preproc_scripts, 'problem_num': problem_nums})
 
-    # 추가 codenet 데이터에서 테스트셋과 겹치는 데이터가 있다는걸 관찰했다.
-    # 1차 필터링을 진행한다.
-    # codenet_df에서 test_df의 데이터와 겹치는 녀석들을 필터링해준다.
-    # 1차 필터링은 단순 set (hash table)을 이용해서 거의 다 필터링해준다. 매우 꼼꼼하게 진행하기 위해 총 3단계 필터링을 거쳤다.
+
+    """ 추가 codenet 데이터에서 테스트셋과 겹치는 데이터가 있다는걸 관찰하였고, 이를 위해 3단계에 걸쳐 필터링 작업을 진행합니다.
+
+    [1차 필터링] : codenet_df에서 test_df의 데이터와 겹치는 녀석들을 set (hash table) 으로 대부분 필터링해줍니다.
+    [2차 필터링] : 1차 필터링 과정에서 trailing space 등의 이유로 set 방법으로 완전하게 걸러지지 않은 데이터를 걸러주는 것이 목적입니다. 이를 위해 코드 문자열에 존재하는 newline들을 전부 이어붙이고, 앞 뒤로 존재하는 공백 및 newline을 제거합니다. 이렇게 전처리된 test code 와 codenet code 문자열들을 각각 set에 넣어 intersection 함으로써 한번 더 걸러주는 작업을 수행합니다.
+    [3차 필터링] : 2차 필터링 과정 이후 test set에 포함된 데이터가 거의 다 제거되었습니다. 그러나 완벽히 제거하기 위해 exhaustive search를 통해 최종적으로 남아있는 test셋의 흔적들을 제거합니다.
+    """
+
+    # [1차 필터링]
     dacon_codes = np.concatenate([train_df['code'].values,
-                                  test_df['code1'].values, test_df['code2'].values])
+                                  test_df['code1'].values,
+                                  test_df['code2'].values]
+                                 )
     dacon_codes_set = set()
 
     for i in tqdm(range(len(dacon_codes))):
@@ -246,39 +249,39 @@ def data_preprocess(args):
     filtered_codenet_df = pd.DataFrame(data={'code': usable_codes,
                                              'problem_num': usable_problem_nums})
 
-    # 데이터 사이즈가 매우 커서 이렇게 완성된 filtered_codenet_df에서 50%의 데이터만 이용해서 학습에 사용한다.
+    # 리소스 문제로, 완성된 filtered_codenet_df 중 50%의 데이터만을 이용해서 학습에 사용합니다.
     filtered_codenet_df = filtered_codenet_df.sample(frac=0.5, random_state=42)
 
-    # 2차 필터링을 진행해준다.
-    # 1차때 trailing space 등의 이유로 set 방법으로 완전하게 걸러지지 않은 녀석들을 걸러주는게 목적이다.
-    # 이걸 위해서 코드 문자열에 존재하는 newline들을 전부 이어붙히고 앞뒤로 존재하는 공백과 newline들을 없앤다.
-    # 이후 이렇게 전처리된 test code와 codenet code 문자열들을 각각 set에 넣고 intersection을 통해 겹치는걸 찾는다.
+
+    # [2차 필터링]
     def simplify(x):
         return ''.join(x.split('\n')).rstrip(' ').strip()
 
     codenet_codes = filtered_codenet_df['code'].values
     codenet_problem_nums = filtered_codenet_df['problem_num'].values
-    test_codes1 = test['code1'].values
-    test_codes2 = test['code2'].values
+    test_codes1 = test_df['code1'].values
+    test_codes2 = test_df['code2'].values
+
     test_codes = np.concatenate([test_codes1, test_codes2])
+
     codenet_set = set()
+
     for i in tqdm(range(len(codenet_codes))):
         codenet_set.add(simplify(codenet_codes[i]))
     test_set = set()
     for i in tqdm(range(len(test_codes))):
         test_set.add(simplify(test_codes[i]))
     intersection = codenet_set.intersection(test_set)
-    usable_codenet_filterd, usable_codenet_filtered_problems = [], []
+    usable_codenet_filtered, usable_codenet_filtered_problems = [], []
     for i in tqdm(range(len(codenet_codes))):
         if simplify(codenet_codes[i]) not in intersection:
             usable_codenet_filtered.append(codenet_codes[i])
             usable_codenet_filtered_problems.append(codenet_problem_nums[i])
     filtered_codenet_df = pd.DataFrame(data={'code': usable_codenet_filtered,
-                                             'problem_num': usable_codenet_filterd_problems})
+                                             'problem_num': usable_codenet_filtered_problems})
 
-    # 3차 필터링을 진행해준다.
-    # 2차 필터링 이후로 test set에 포함된 데이터가 추가 데이터에서 거의 다 제거되었겠지만
-    # 확실하게 전부 제거해주기 위해 exhaustive search를 최종적으로 남아있는 test셋의 흔적들을 없애버립니다.
+
+    # [3차 필터링]
     codenet_codes = filtered_codenet_df['code'].values
     problem_nums = filtered_codenet_df['problem_num'].values
     usable_codenet_filtered, usable_codenet_filtered_problems = [], []
@@ -292,23 +295,26 @@ def data_preprocess(args):
                     usable = False
                     break
         if usable == True:
-            usable_codenet_filterd.append(codenet_codes[i])
+            usable_codenet_filtered.append(codenet_codes[i])
             usable_codenet_filtered_problems.append(problem_nums[i])
 
     filtered_codenet_df = pd.DataFrame(data={'code': usable_codenet_filtered,
-                                             'problem_num': usable_codenet_filterd_problems})
+                                             'problem_num': usable_codenet_filtered_problems})
 
-    # 데이터 프레임을 만들었으니 이제 train/val split을 진행한다.
-    # 이후에 positive, negative pairs를 생성한다.
-    # 청소님의 코드를 참고해서 hard negative pair를 생성하는데 BM25대신 BM25L을 사용한다.
-    # tokenizer는 왼쪽부터 truncation을 진행하게해서 truncation이 필요할때는 코드의 끝 부분들을 이용하게 만든다.
+
+    # 데이터 프레임을 만들었으니 이제 train/val split을 진행하고, positive, negative pairs를 생성합니다.
+    # 청소님의 코드를 참고해서 hard negative pair를 생성하였으며, BM25대신 BM25L을 사용합니다.
+    # (BM25, BM25L 모두 테스트한 결과 BM25L에서 더 좋은 성능을 보였습니다.)
+    # tokenizer는 왼쪽부터 truncation을 진행하여 truncation이 필요할때는 코드의 끝 부분들을 이용하게 만듭니다.
+
     dacon_train_df, dacon_valid_df, dacon_train_label, dacon_valid_label = train_test_split(
         train_df,
         train_df['problem_num'],
         random_state=args.seed,
         test_size=0.1,
-        stratify=full_df['problem_num']
+        stratify=filtered_codenet_df['problem_num']
     )
+
     dacon_train_df = dacon_train_df.reset_index(drop=True)
     dacon_valid_df = dacon_valid_df.reset_index(drop=True)
 
@@ -318,7 +324,7 @@ def data_preprocess(args):
     dacon_train_bm25L = get_pairs(dacon_train_df, tokenizer)
     dacon_valid_bm25L = get_pairs(dacon_valid_df, tokenizer)
 
-    # 생성된 데이터 저장
+    # 생성된 데이터를 저장합니다. => 이 과정까지의 생성 시간이 꽤 오래걸립니다.
     dacon_train_bm25L.to_csv("./data/" + "new_dataset_0607/graph_dacon_train_bm25L.csv", index=False)
     dacon_valid_bm25L.to_csv("./data/" + "new_dataset_0607/graph_dacon_valid_bm25L.csv", index=False)
     processed_test.to_csv("./data/new_dataset_0604/processed_test.csv", index=False)
@@ -328,14 +334,15 @@ def data_preprocess(args):
         filtered_codenet_df['problem_num'],
         random_state=args.seed,
         test_size=0.1,
-        stratify=full_df['problem_num']
+        stratify=filtered_codenet_df['problem_num']
     )
     codenet_train_df = codenet_train_df.reset_index(drop=True)
     codenet_valid_df = codenet_valid_df.reset_index(drop=True)
 
     codenet_train_bm25L = get_pairs(codenet_train_df, tokenizer)
     codenet_valid_bm25L = get_pairs(codenet_valid_df, tokenizer)
-    # 생성된 데이터 저장
+
+    # 생성된 데이터를 저장합니다.
     codenet_train_bm25L.to_csv("./data/" + "new_dataset_0607/graph_codenet_train_bm25L.csv",
                                index=False)
     codenet_valid_bm25L.to_csv("./data/" + "new_dataset_0607/graph_codenet_valid_bm25L.csv",
@@ -350,10 +357,45 @@ def set_seed(args):
     torch.cuda.manual_seed(args.seed)
 
 
+
 def train_model(args):
+
+    """
+    전처리된 데이터 호출 및 모델을 학습시키는 과정입니다.
+
+    순서는 다음과 같습니다.
+
+    [1. 전처리 과정에서 생성된 데이터 호출]
+    1-1. dacon - train: graph_dacon_train_bm25L.csv
+    1-2, dacon - valid: graph_dacon_valid_bm25L.csv
+    2-1. codenet - train: graph_codenet_train_bm25L.csv
+    2-2. codenet - valid: graph_codenet_valid_bm25L.csv
+
+    [2. 텐서 생성]
+    위 데이터를 호출하여 하나의 train_data, valid_data 로 만든 후 텐서를 생성합니다.
+
+    - 이 과정까지 각 모델에 대해 전부 진행되기 때문에, 다소 시간이 걸릴 수 있는 점 참고부탁드립니다.
+    - 파일명: [모델명]_mixed_[train or valid]_[input_ids or attention_masks]_[BM25 or BM25L].pt (ex:) _mixed_train_input_ids_BM25L_0608.pt)
+
+    :param args:
+        --seed 42
+        --learning_rate 2e-5
+        --eps 1e-5
+        --epochs 3
+        --batch_size 32
+        --test_batch_size 1048
+        --save_tensor True
+        --mode train
+        --dir_path graphcodebert
+        --model_name graphcodebert
+        --process_name code_similarity
+        --checkpoint_path microsoft/graphcodebert-base
+    :return: X
+    """
 
     set_seed(args)
     setproctitle(args.process_name)
+
     dacon_train_data = pd.read_csv("./data/" + "new_dataset_0607/graph_dacon_train_bm25L.csv")
     dacon_valid_data = pd.read_csv("./data/" + "new_dataset_0607/graph_dacon_valid_bm25L.csv")
 
@@ -420,7 +462,6 @@ def train_model(args):
     if os.path.exists(args.dir_path):
         os.makedirs(args.dir_path, exist_ok=True)
 
-
     print("\n\nMake tensor\n\n")
     input_ids = torch.tensor(input_ids, dtype=int)
     attention_masks = torch.tensor(attention_masks, dtype=int)
@@ -429,6 +470,7 @@ def train_model(args):
     valid_input_ids = torch.tensor(valid_input_ids, dtype=int)
     valid_attention_masks = torch.tensor(valid_attention_masks, dtype=int)
     valid_labels = torch.tensor(valid_labels, dtype=int)
+
 
     if args.save_tensor == True:
         torch.save(input_ids, "./data/" + args.dir_path + "/" + args.model_name + '_mixed_train_input_ids_BM25L_0608.pt')
@@ -650,7 +692,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     if args.mode == "train":
-        data_preprocess()
+        data_preprocess(args)
         train_model(args)
     else:
         inference_model(args)
